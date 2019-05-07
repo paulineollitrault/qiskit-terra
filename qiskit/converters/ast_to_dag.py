@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2018, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2018.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """
 AST (abstract syntax tree) to DAG (directed acyclic graph) converter.
@@ -181,11 +188,11 @@ class AstInterpreter:
         maxidx = max([len(id0), len(id1)])
         for idx in range(maxidx):
             if len(id0) > 1 and len(id1) > 1:
-                self.dag.apply_operation_back(CXBase(id0[idx], id1[idx]), self.condition)
+                self.dag.apply_operation_back(CXBase(), [id0[idx], id1[idx]], [], self.condition)
             elif len(id0) > 1:
-                self.dag.apply_operation_back(CXBase(id0[idx], id1[0]), self.condition)
+                self.dag.apply_operation_back(CXBase(), [id0[idx], id1[0]], [], self.condition)
             else:
-                self.dag.apply_operation_back(CXBase(id0[0], id1[idx]), self.condition)
+                self.dag.apply_operation_back(CXBase(), [id0[0], id1[idx]], [], self.condition)
 
     def _process_measure(self, node):
         """Process a measurement node."""
@@ -195,7 +202,7 @@ class AstInterpreter:
             raise QiskitError("internal error: reg size mismatch",
                               "line=%s" % node.line, "file=%s" % node.file)
         for idx, idy in zip(id0, id1):
-            self.dag.apply_operation_back(Measure(idx, idy), self.condition)
+            self.dag.apply_operation_back(Measure(), [idx], [idy], self.condition)
 
     def _process_if(self, node):
         """Process an if node."""
@@ -281,12 +288,12 @@ class AstInterpreter:
             for qubit in ids:
                 for j, _ in enumerate(qubit):
                     qubits.append(qubit[j])
-            self.dag.apply_operation_back(Barrier(qubits))
+            self.dag.apply_operation_back(Barrier(len(qubits)), qubits, [])
 
         elif node.type == "reset":
             id0 = self._process_bit_id(node.children[0])
             for i, _ in enumerate(id0):
-                self.dag.apply_operation_back(Reset(id0[i]), self.condition)
+                self.dag.apply_operation_back(Reset(), [id0[i]], [], self.condition)
 
         elif node.type == "if":
             self._process_if(node)
@@ -372,6 +379,6 @@ class AstInterpreter:
         else:
             raise QiskitError("unknown operation for ast node name %s" % name)
 
-        op = op_class(*params, *qargs)
+        op = op_class(*params)
 
-        self.dag.apply_operation_back(op, condition=self.condition)
+        self.dag.apply_operation_back(op, qargs, [], condition=self.condition)

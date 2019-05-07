@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2017, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 # pylint: disable=invalid-name,assignment-from-no-return
 
@@ -293,6 +300,25 @@ class Pauli:
                 mat = sparse.bmat([[None, -mat], [mat, None]], format='coo')
 
         return mat.tocsr()
+
+    def to_operator(self):
+        """Convert to Operator object."""
+        # Place import here to avoid cyclic import from circuit visualization
+        from qiskit.quantum_info.operators.operator import Operator
+        return Operator(self.to_matrix())
+
+    def to_instruction(self):
+        """Convert to Pauli circuit instruction."""
+        from qiskit.circuit import QuantumCircuit, QuantumRegister
+        from qiskit.extensions.standard import IdGate, XGate, YGate, ZGate
+        gates = {'I': IdGate(), 'X': XGate(), 'Y': YGate(), 'Z': ZGate()}
+        label = self.to_label()
+        n_qubits = self.numberofqubits
+        qreg = QuantumRegister(n_qubits)
+        circuit = QuantumCircuit(qreg, name='Pauli:{}'.format(label))
+        for i, pauli in enumerate(reversed(label)):
+            circuit.append(gates[pauli], [qreg[i]])
+        return circuit.to_instruction()
 
     def update_z(self, z, indices=None):
         """

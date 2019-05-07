@@ -7,7 +7,7 @@
 
 """The generic qobj models."""
 
-from marshmallow.validate import Length, Range
+from marshmallow.validate import Range
 
 from qiskit.validation import BaseSchema, bind_schema, BaseModel
 from qiskit.validation.fields import String, Nested, Integer
@@ -34,8 +34,7 @@ class QobjExperimentSchema(BaseSchema):
     """Base Schema for QobjExperiment."""
 
     # Required properties.
-    instructions = Nested(QobjInstructionSchema, required=True, many=True,
-                          validate=Length(min=1))
+    instructions = Nested(QobjInstructionSchema, required=True, many=True)
 
     # Optional properties.
     header = Nested(QobjExperimentHeaderSchema)
@@ -47,7 +46,7 @@ class QobjConfigSchema(BaseSchema):
 
     # Optional properties.
     max_credits = Integer()
-    seed = Integer()
+    seed_simulator = Integer()
     memory_slots = Integer(validate=Range(min=0))
     shots = Integer(validate=Range(min=1))
 

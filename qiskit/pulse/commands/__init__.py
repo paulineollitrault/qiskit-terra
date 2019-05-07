@@ -6,12 +6,12 @@
 # the LICENSE.txt file in the root directory of this source tree.
 
 """Command classes for pulse."""
-
-from .pulse_command import PulseCommand
-from .sample_pulse import SamplePulse
-
-from .acquire import Acquire, Discriminator, Kernel
-from .frame_change import FrameChange
-from .persistent_value import PersistentValue
-from .functional_pulse import FunctionalPulse
+from .instruction import Instruction
+from .acquire import Acquire, AcquireInstruction
+from .frame_change import FrameChange, FrameChangeInstruction
+from .meas_opts import Discriminator, Kernel
+from .persistent_value import PersistentValue, PersistentValueInstruction
+from .command import Command
+from .pulse_decorators import functional_pulse
+from .sample_pulse import SamplePulse, PulseInstruction
 from .snapshot import Snapshot

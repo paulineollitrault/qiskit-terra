@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2018, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2018.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """
 A pass implementing the default Qiskit stochastic mapper.
@@ -18,12 +25,11 @@ from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.transpiler.exceptions import TranspilerError
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.extensions.standard import SwapGate
-from qiskit.mapper import Layout
-from .barrier_before_final_measurements import BarrierBeforeFinalMeasurements
+from qiskit.transpiler import Layout
 # pylint: disable=no-name-in-module, import-error
 from .cython.stochastic_swap.utils import nlayout_from_layout
 # pylint: disable=no-name-in-module, import-error
-from .cython.stochastic_swap._swap_trial import swap_trial
+from .cython.stochastic_swap.swap_trial import swap_trial
 logger = getLogger(__name__)
 
 
@@ -77,7 +83,6 @@ class StochasticSwap(TransformationPass):
         self.seed = seed
         self.qregs = None
         self.rng = None
-        self.requires.append(BarrierBeforeFinalMeasurements())
 
     def run(self, dag):
         """
@@ -110,7 +115,10 @@ class StochasticSwap(TransformationPass):
         self.input_layout = self.initial_layout.copy()
 
         self.qregs = dag.qregs
+        if self.seed is None:
+            self.seed = np.random.randint(0, np.iinfo(np.int32).max)
         self.rng = np.random.RandomState(self.seed)
+        logger.debug("StochasticSwap RandomState seeded with seed=%s", self.seed)
 
         new_dag = self._mapper(dag, self.coupling_map, trials=self.trials)
         # self.property_set["layout"] = self.initial_layout
@@ -495,8 +503,8 @@ def _layer_permutation(layer_partition, initial_layout, layout, qubit_subset,
 
     edgs = best_edges.edges()
     for idx in range(best_edges.size//2):
-        slice_circuit.apply_operation_back(SwapGate(initial_layout[edgs[2*idx]],
-                                                    initial_layout[edgs[2*idx+1]]))
+        slice_circuit.apply_operation_back(
+            SwapGate(), [initial_layout[edgs[2*idx]], initial_layout[edgs[2*idx+1]]], [])
     trial_circuit.extend_back(slice_circuit)
     best_circuit = trial_circuit
 
