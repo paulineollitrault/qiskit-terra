@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """Test for the CmdDef object."""
 
@@ -15,6 +22,7 @@ from qiskit.qobj.converters import QobjToInstructionConverter
 from qiskit.qobj import PulseQobjInstruction
 from qiskit.pulse import (CmdDef, SamplePulse, Schedule, DeviceSpecification,
                           PulseError, PersistentValue)
+from qiskit.pulse.schedule import ParameterizedSchedule
 
 
 class TestCmdDef(QiskitTestCase):
@@ -76,8 +84,54 @@ class TestCmdDef(QiskitTestCase):
         cmd_def.add('pv_test', 0, converted_instruction)
         self.assertEqual(cmd_def.get_parameters('pv_test', 0), ('P1', 'P2'))
 
-        sched = cmd_def.get('pv_test', 0, P1='0', P2=-1)
+        sched = cmd_def.get('pv_test', 0, 0, P2=-1)
         self.assertEqual(sched.instructions[0][-1].command.value, -1)
+
+        with self.assertRaises(PulseError):
+            cmd_def.get('pv_test', 0, 0, P1=-1)
+
+        with self.assertRaises(PulseError):
+            cmd_def.get('pv_test', 0, P1=1, P2=2, P3=3)
+
+        sched = cmd_def.pop('pv_test', 0, 0, P2=-1)
+        self.assertEqual(sched.instructions[0][-1].command.value, -1)
+
+        self.assertFalse(cmd_def.has('pv_test', 0))
+
+    def test_sequenced_parameterized_schedule(self):
+        """Test parametrized schedule consist of multiple instruction. """
+        cmd_def = CmdDef()
+        converter = QobjToInstructionConverter([], buffer=0)
+        qobjs = [PulseQobjInstruction(name='fc', ch='d0', t0=10, phase='P1'),
+                 PulseQobjInstruction(name='fc', ch='d0', t0=20, phase='P2'),
+                 PulseQobjInstruction(name='fc', ch='d0', t0=30, phase='P3')]
+        converted_instruction = [converter(qobj) for qobj in qobjs]
+
+        cmd_def.add('inst_seq', 0, ParameterizedSchedule(*converted_instruction, name='inst_seq'))
+
+        with self.assertRaises(PulseError):
+            cmd_def.get('inst_seq', 0, P1=1, P2=2, P3=3, P4=4, P5=5)
+
+        with self.assertRaises(PulseError):
+            cmd_def.get('inst_seq', 0, P1=1)
+
+        with self.assertRaises(PulseError):
+            cmd_def.get('inst_seq', 0, 1, 2, 3, P1=1)
+
+        sched = cmd_def.get('inst_seq', 0, 1, 2, 3)
+        self.assertEqual(sched.instructions[0][-1].command.phase, 1)
+        self.assertEqual(sched.instructions[1][-1].command.phase, 2)
+        self.assertEqual(sched.instructions[2][-1].command.phase, 3)
+
+        sched = cmd_def.get('inst_seq', 0, P1=1, P2=2, P3=3)
+        self.assertEqual(sched.instructions[0][-1].command.phase, 1)
+        self.assertEqual(sched.instructions[1][-1].command.phase, 2)
+        self.assertEqual(sched.instructions[2][-1].command.phase, 3)
+
+        sched = cmd_def.get('inst_seq', 0, 1, 2, P3=3)
+        self.assertEqual(sched.instructions[0][-1].command.phase, 1)
+        self.assertEqual(sched.instructions[1][-1].command.phase, 2)
+        self.assertEqual(sched.instructions[2][-1].command.phase, 3)
 
     def test_build_cmd_def(self):
         """Test building of parameterized cmd_def from defaults."""

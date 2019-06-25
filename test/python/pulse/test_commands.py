@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 # pylint: disable=invalid-name,unexpected-keyword-arg
 
@@ -43,15 +50,20 @@ class TestAcquire(QiskitTestCase):
         self.assertEqual(acq_command.discriminator.params, discriminator_opts)
         self.assertEqual(acq_command.kernel.name, 'boxcar')
         self.assertEqual(acq_command.kernel.params, kernel_opts)
+        self.assertTrue(acq_command.name.startswith('acq'))
 
     def test_can_construct_acquire_command_with_default_values(self):
         """Test if an acquire command can be constructed with default discriminator and kernel.
         """
-        acq_command = Acquire(duration=10)
+        acq_command_a = Acquire(duration=10)
+        acq_command_b = Acquire(duration=10)
 
-        self.assertEqual(acq_command.duration, 10)
-        self.assertEqual(acq_command.discriminator, None)
-        self.assertEqual(acq_command.kernel, None)
+        self.assertEqual(acq_command_a.duration, 10)
+        self.assertEqual(acq_command_a.discriminator, None)
+        self.assertEqual(acq_command_a.kernel, None)
+        self.assertTrue(acq_command_a.name.startswith('acq'))
+        self.assertNotEqual(acq_command_a.name, acq_command_b.name)
+        self.assertEqual(acq_command_b.name, 'acq' + str(int(acq_command_a.name[3:]) + 1))
 
 
 class TestFrameChange(QiskitTestCase):
@@ -60,10 +72,11 @@ class TestFrameChange(QiskitTestCase):
     def test_default(self):
         """Test default frame change.
         """
-        fc_command = FrameChange(phase=1.57 - 0.785j)
+        fc_command = FrameChange(phase=1.57)
 
-        self.assertEqual(fc_command.phase, 1.57-0.785j)
+        self.assertEqual(fc_command.phase, 1.57)
         self.assertEqual(fc_command.duration, 0)
+        self.assertTrue(fc_command.name.startswith('fc'))
 
 
 class TestFunctionalPulse(QiskitTestCase):
@@ -100,6 +113,7 @@ class TestPersistentValue(QiskitTestCase):
 
         self.assertEqual(pv_command.value, 0.5-0.5j)
         self.assertEqual(pv_command.duration, 0)
+        self.assertTrue(pv_command.name.startswith('pv'))
 
 
 class TestSnapshot(QiskitTestCase):

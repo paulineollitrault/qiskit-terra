@@ -1,11 +1,19 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """Test cases for the timeslots."""
+
 import unittest
 
 from qiskit.pulse.channels import AcquireChannel
@@ -111,6 +119,23 @@ class TestTimeslotCollection(QiskitTestCase):
         actual = TimeslotCollection(Timeslot(Interval(1, 3), AcquireChannel(0))).shift(10)
         expected = TimeslotCollection(Timeslot(Interval(11, 13), AcquireChannel(0)))
         self.assertEqual(expected, actual)
+
+    def test_is_mergeable_does_not_mutate_TimeslotCollection(self):
+        """Test that is_mergeable_with does not mutate the given TimeslotCollection"""
+
+        # Different channel but different interval
+        col1 = TimeslotCollection(Timeslot(Interval(1, 2), AcquireChannel(0)))
+        expected_channels = col1.channels
+        col2 = TimeslotCollection(Timeslot(Interval(3, 4), AcquireChannel(1)))
+        col1.is_mergeable_with(col2)
+        self.assertEqual(col1.channels, expected_channels)
+
+        # Different channel but same interval
+        col1 = TimeslotCollection(Timeslot(Interval(1, 2), AcquireChannel(0)))
+        expected_channels = col1.channels
+        col2 = TimeslotCollection(Timeslot(Interval(1, 2), AcquireChannel(1)))
+        col1.is_mergeable_with(col2)
+        self.assertEqual(col1.channels, expected_channels)
 
 
 if __name__ == '__main__':

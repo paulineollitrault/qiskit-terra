@@ -1,23 +1,28 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """
 Specification of the device.
 """
-import logging
 from typing import List
 
 from qiskit.validation.exceptions import ModelValidationError
 
+from qiskit.pulse.exceptions import PulseError
 from .pulse_channels import DriveChannel, ControlChannel, MeasureChannel
 from .channels import AcquireChannel, MemorySlot, RegisterSlot
 from .qubit import Qubit
-
-logger = logging.getLogger(__name__)
 
 
 class DeviceSpecification:
@@ -48,6 +53,9 @@ class DeviceSpecification:
             PulseError: when an invalid backend is specified
         """
         backend_config = backend.configuration()
+
+        if not backend_config.open_pulse:
+            raise PulseError(backend_config.backend_name + ' does not support OpenPulse.')
 
         # TODO : Remove usage of config.defaults when backend.defaults() is updated.
         try:

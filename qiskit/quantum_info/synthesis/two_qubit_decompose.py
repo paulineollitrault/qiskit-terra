@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 # pylint: disable=invalid-name
 
@@ -444,7 +451,7 @@ class TwoQubitBasisDecomposer():
         for i in range(best_nbasis):
             return_circuit.append(U3Gate(*decomposition_angles[2*i]), [q[0]])
             return_circuit.append(U3Gate(*decomposition_angles[2*i+1]), [q[1]])
-            return_circuit.append(CnotGate(), [q[0], q[1]])
+            return_circuit.append(self.gate, [q[0], q[1]])
         return_circuit.append(U3Gate(*decomposition_angles[2*best_nbasis]), [q[0]])
         return_circuit.append(U3Gate(*decomposition_angles[2*best_nbasis+1]), [q[1]])
 

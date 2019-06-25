@@ -17,13 +17,11 @@ Timeslots for channels.
 """
 from collections import defaultdict
 import itertools
-import logging
 from typing import List, Tuple
 
 from .channels import Channel
 from .exceptions import PulseError
 
-logger = logging.getLogger(__name__)
 
 # pylint: disable=missing-return-doc
 
@@ -222,9 +220,10 @@ class TimeslotCollection:
             timeslots: TimeslotCollection to be checked
         """
         for slot in timeslots.timeslots:
-            for interval in self._table[slot.channel]:
-                if slot.interval.has_overlap(interval):
-                    return False
+            if slot.channel in self.channels:
+                for interval in self._table[slot.channel]:
+                    if slot.interval.has_overlap(interval):
+                        return False
         return True
 
     def merged(self, timeslots: 'TimeslotCollection') -> 'TimeslotCollection':

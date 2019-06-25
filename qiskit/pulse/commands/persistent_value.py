@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """
 Persistent value.
@@ -18,12 +25,15 @@ from .command import Command
 class PersistentValue(Command):
     """Persistent value."""
 
-    def __init__(self, value):
+    prefix = 'pv'
+
+    def __init__(self, value, name=None):
         """create new persistent value command.
 
         Args:
             value (complex): Complex value to apply, bounded by an absolute value of 1.
                 The allowable precision is device specific.
+            name (str): Name of this command.
         Raises:
             PulseError: when input value exceed 1.
         """
@@ -33,6 +43,7 @@ class PersistentValue(Command):
             raise PulseError("Absolute value of PV amplitude exceeds 1.")
 
         self._value = complex(value)
+        self._name = PersistentValue.create_name(name)
 
     @property
     def value(self):

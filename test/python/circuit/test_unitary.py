@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """Quick program to test the qi tools modules."""
 
@@ -87,9 +94,8 @@ class TestUnitaryCircuit(QiskitTestCase):
         dnode = dag_nodes[0]
         self.assertIsInstance(dnode.op, UnitaryGate)
         for qubit in dnode.qargs:
-            self.assertTrue(qubit[1] in [0, 1])
-        self.assertTrue(numpy.allclose(dnode.op.to_matrix(),
-                                       matrix))
+            self.assertTrue(qubit.index in [0, 1])
+        self.assertTrue(numpy.allclose(dnode.op.to_matrix(), matrix))
 
     def test_2q_unitary(self):
         """test 2 qubit unitary matrix"""
@@ -116,7 +122,7 @@ class TestUnitaryCircuit(QiskitTestCase):
         dnode = nodes[0]
         self.assertIsInstance(dnode.op, UnitaryGate)
         for qubit in dnode.qargs:
-            self.assertTrue(qubit[1] in [0, 1])
+            self.assertTrue(qubit.index in [0, 1])
         self.assertTrue(numpy.allclose(dnode.op.to_matrix(),
                                        matrix))
         qc3 = dag_to_circuit(dag)
@@ -141,7 +147,7 @@ class TestUnitaryCircuit(QiskitTestCase):
         dnode = nodes[0]
         self.assertIsInstance(dnode.op, UnitaryGate)
         for qubit in dnode.qargs:
-            self.assertTrue(qubit[1] in [0, 1, 3])
+            self.assertTrue(qubit.index in [0, 1, 3])
         self.assertTrue(numpy.allclose(dnode.op.to_matrix(),
                                        matrix))
 
@@ -163,7 +169,7 @@ class TestUnitaryCircuit(QiskitTestCase):
             numpy.array(instr.params).astype(numpy.complex64),
             matrix))
         # check conversion to dict
-        qobj_dict = qobj.as_dict()
+        qobj_dict = qobj.to_dict()
         # check json serialization
         self.assertTrue(isinstance(json.dumps(qobj_dict), str))
 

@@ -72,10 +72,8 @@ class BackendConfigurationSchema(BaseSchema):
     backend_version = String(required=True,
                              validate=Regexp("[0-9]+.[0-9]+.[0-9]+$"))
     n_qubits = Integer(required=True, validate=Range(min=1))
-    basis_gates = List(String(), required=True,
-                       validate=Length(min=1))
-    gates = Nested(GateConfigSchema, required=True, many=True,
-                   validate=Length(min=1))
+    basis_gates = List(String(), required=True)
+    gates = Nested(GateConfigSchema, required=True, many=True)
     local = Boolean(required=True)
     simulator = Boolean(required=True)
     conditional = Boolean(required=True)
@@ -120,7 +118,7 @@ class PulseBackendConfigurationSchema(QasmBackendConfigurationSchema):
                               validate=Length(equal=2)), required=True)
     dt = Float(required=True, validate=Range(min=0))  # pylint: disable=invalid-name
     dtm = Float(required=True, validate=Range(min=0))
-    rep_times = List(Float(validate=Range(min=0)), required=True)
+    rep_times = List(Integer(validate=Range(min=0)), required=True)
     meas_kernels = List(String(), required=True)
     discriminators = List(String(), required=True)
 

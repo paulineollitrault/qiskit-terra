@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """
 Command definition module. Relates circuit gates to pulse commands.
@@ -109,12 +116,14 @@ class CmdDef:
         return False
 
     def get(self, cmd_name: str, qubits: Union[int, Iterable[int]],
-            **params: Dict[str, Union[float, complex]]) -> Schedule:
+            *params: List[Union[int, float, complex]],
+            **kwparams: Dict[str, Union[int, float, complex]]) -> Schedule:
         """Get command from command definition.
         Args:
             cmd_name: Name of the command
             qubits: Ordered list of qubits command applies to
-            **params: Command parameters to be used to generate schedule
+            *params: Command parameters to be used to generate schedule
+            **kwparams: Keyworded command parameters to be used to generate schedule
 
         Raises:
             PulseError: If command for qubits is not available
@@ -124,7 +133,7 @@ class CmdDef:
             schedule = self._cmd_dict[cmd_name][qubits]
 
             if isinstance(schedule, ParameterizedSchedule):
-                return schedule.bind_parameters(**params)
+                return schedule.bind_parameters(*params, **kwparams)
 
             return schedule.flatten()
 
@@ -151,13 +160,15 @@ class CmdDef:
                              'in CmdDef'.format(cmd_name, qubits))
 
     def pop(self, cmd_name: str, qubits: Union[int, Iterable[int]],
-            **params: Dict[str, Union[float, complex]]) -> Schedule:
+            *params: List[Union[int, float, complex]],
+            **kwparams: Dict[str, Union[int, float, complex]]) -> Schedule:
         """Pop command from command definition.
 
         Args:
             cmd_name: Name of the command
             qubits: Ordered list of qubits command applies to
-            **params: Command parameters to be used to generate schedule
+            *params: Command parameters to be used to generate schedule
+            **kwparams: Keyworded command parameters to be used to generate schedule
 
         Raises:
             PulseError: If command for qubits is not available
@@ -168,7 +179,7 @@ class CmdDef:
             schedule = cmd_dict.pop(qubits)
 
             if isinstance(schedule, ParameterizedSchedule):
-                return schedule.bind_parameters(**params)
+                return schedule.bind_parameters(*params, **kwparams)
 
             return schedule
 
@@ -186,7 +197,7 @@ class CmdDef:
         if cmd_name in self._cmd_dict:
             return list(sorted(self._cmd_dict[cmd_name].keys()))
 
-        raise PulseError('Command %s does not exist in CmdDef.' % cmd_name)
+        return []
 
     def __repr__(self):
         return repr(self._cmd_dict)

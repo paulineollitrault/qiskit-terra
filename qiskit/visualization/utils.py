@@ -1,16 +1,28 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2018, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree
+# (C) Copyright IBM 2017, 2018.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """Common visualization utilities."""
 
-import PIL
 import numpy as np
 from qiskit.converters import circuit_to_dag
 from qiskit.visualization.exceptions import VisualizationError
+
+try:
+    import PIL
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 
 def _validate_input_state(quantum_state):
@@ -39,6 +51,10 @@ def _validate_input_state(quantum_state):
 
 def _trim(image):
     """Trim a PIL image and remove white space."""
+    if not HAS_PIL:
+        raise ImportError('The latex drawer needs pillow installed. '
+                          'Run "pip install pillow" before using the '
+                          'latex drawer.')
     background = PIL.Image.new(image.mode, image.size, image.getpixel((0, 0)))
     diff = PIL.ImageChops.difference(image, background)
     diff = PIL.ImageChops.add(diff, diff, 2.0, -100)

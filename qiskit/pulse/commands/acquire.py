@@ -1,9 +1,16 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2019, IBM.
+# This code is part of Qiskit.
 #
-# This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# (C) Copyright IBM 2017, 2019.
+#
+# This code is licensed under the Apache License, Version 2.0. You may
+# obtain a copy of this license in the LICENSE.txt file in the root directory
+# of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
+#
+# Any modifications or derivative works of this code must retain this
+# copyright notice, and modified files need to carry a notice indicating
+# that they have been altered from the originals.
 
 """
 Acquire.
@@ -21,8 +28,9 @@ class Acquire(Command):
     """Acquire."""
 
     ALIAS = 'acquire'
+    prefix = 'acq'
 
-    def __init__(self, duration, discriminator=None, kernel=None):
+    def __init__(self, duration, discriminator=None, kernel=None, name=None):
         """Create new acquire command.
 
         Args:
@@ -32,11 +40,14 @@ class Acquire(Command):
             kernel (Kernel): The data structures defining the measurement kernels
                 to be used (from the list of available kernels) and set of parameters
                 (if applicable) if the measurement level is 1 or 2.
+            name (str): Name of this command.
 
         Raises:
             PulseError: when invalid discriminator or kernel object is input.
         """
         super().__init__(duration=duration)
+
+        self._name = Acquire.create_name(name)
 
         if discriminator:
             if isinstance(discriminator, Discriminator):
