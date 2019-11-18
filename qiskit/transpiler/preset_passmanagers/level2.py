@@ -29,7 +29,6 @@ from qiskit.transpiler.passes import CheckMap
 from qiskit.transpiler.passes import CXDirection
 from qiskit.transpiler.passes import SetLayout
 from qiskit.transpiler.passes import DenseLayout
-from qiskit.transpiler.passes import NoiseAdaptiveLayout
 from qiskit.transpiler.passes import BarrierBeforeFinalMeasurements
 from qiskit.transpiler.passes import StochasticSwap
 from qiskit.transpiler.passes import FullAncillaAllocation
@@ -40,6 +39,7 @@ from qiskit.transpiler.passes import RemoveResetInZeroState
 from qiskit.transpiler.passes import Optimize1qGates
 from qiskit.transpiler.passes import CommutativeCancellation
 from qiskit.transpiler.passes import ApplyLayout
+from qiskit.transpiler.passes import CheckCXDirection
 
 
 def level_2_pass_manager(transpile_config):
@@ -79,9 +79,7 @@ def level_2_pass_manager(transpile_config):
     def _choose_layout_condition(property_set):
         return not property_set['layout']
 
-    _choose_layout = DenseLayout(coupling_map)
-    if backend_properties:
-        _choose_layout = NoiseAdaptiveLayout(backend_properties)
+    _choose_layout = DenseLayout(coupling_map, backend_properties)
 
     # 3. Extend dag/layout with ancillas using the full coupling map
     _embed = [FullAncillaAllocation(coupling_map), EnlargeWithAncilla(), ApplyLayout()]
@@ -89,18 +87,20 @@ def level_2_pass_manager(transpile_config):
     # 4. Unroll to 1q or 2q gates, swap to fit the coupling map
     _swap_check = CheckMap(coupling_map)
 
+    _add_barrier = BarrierBeforeFinalMeasurements()
+
     def _swap_condition(property_set):
         return not property_set['is_swap_mapped']
 
-    _swap = [BarrierBeforeFinalMeasurements(),
-             Unroll3qOrMore(),
+    _swap = [Unroll3qOrMore(),
              StochasticSwap(coupling_map, trials=20, seed=seed_transpiler),
              Decompose(SwapGate)]
 
     # 5. Fix any bad CX directions
-    # _direction_check = CheckCXDirection(coupling_map)  # TODO
+    _direction_check = [CheckCXDirection(coupling_map)]
+
     def _direction_condition(property_set):
-        return not coupling_map.is_symmetric and not property_set['is_direction_mapped']
+        return not property_set['is_direction_mapped']
 
     _direction = [CXDirection(coupling_map)]
 
@@ -122,9 +122,11 @@ def level_2_pass_manager(transpile_config):
         pm2.append(_choose_layout, condition=_choose_layout_condition)
         pm2.append(_embed)
         pm2.append(_swap_check)
+        pm2.append(_add_barrier)
         pm2.append(_swap, condition=_swap_condition)
-        # pm2.append(_direction_check)  # TODO
-        pm2.append(_direction, condition=_direction_condition)
+        if not coupling_map.is_symmetric:
+            pm2.append(_direction_check)
+            pm2.append(_direction, condition=_direction_condition)
     pm2.append(_reset)
     pm2.append(_depth_check + _opt, do_while=_opt_control)
 

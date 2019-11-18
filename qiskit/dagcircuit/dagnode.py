@@ -12,17 +12,17 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
-"""Object to represent the information at a node in the DAGCircuit
-"""
+"""Object to represent the information at a node in the DAGCircuit"""
+
+import warnings
 
 from qiskit.exceptions import QiskitError
 
 
 class DAGNode:
-    """
-    Object to represent the information at a node in the DAGCircuit
+    """Object to represent the information at a node in the DAGCircuit
 
-    It is used as the return value from *_nodes() functions and can
+    It is used as the return value from `*_nodes()` functions and can
     be supplied to functions that take a node.
     """
 
@@ -56,8 +56,7 @@ class DAGNode:
     @property
     def qargs(self):
         """
-        Returns list of (QuantumRegister, int) tuples where the int is the index
-        of the qubit else an empty list
+        Returns list of Qubit else an empty list
         """
         return self.data_dict.get('qargs', [])
 
@@ -69,8 +68,7 @@ class DAGNode:
     @property
     def cargs(self):
         """
-        Returns list of (ClassicalRegister, int) tuples where the int is the index
-        of the cbit else an empty list
+        Returns list of Clbit else an empty list
         """
         return self.data_dict.get('cargs', [])
 
@@ -85,8 +83,7 @@ class DAGNode:
     @property
     def wire(self):
         """
-        Returns (Register, int) tuple where the int is the index of
-        the wire else None
+        Returns the Bit object else None
         """
         if self.data_dict['type'] not in ['in', 'out']:
             raise QiskitError('The node %s is not an input/output node' % str(self))
@@ -111,6 +108,7 @@ class DAGNode:
 
     def pop(self, val):
         """Remove the provided value from the dictionary"""
+        warnings.warn('DAGNode.pop has been deprecated.', DeprecationWarning)
         del self.data_dict[val]
 
     @staticmethod

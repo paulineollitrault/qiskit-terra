@@ -30,8 +30,22 @@ from qiskit.transpiler.passes import FullAncillaAllocation
 from qiskit.transpiler.passes import EnlargeWithAncilla
 from qiskit.transpiler.passes import RemoveResetInZeroState
 
-from qiskit.visualization.pass_manager_visualization import HAS_GRAPHVIZ
 from .visualization import QiskitVisualizationTestCase, path_to_diagram_reference
+
+try:
+    import subprocess
+
+    _PROC = subprocess.Popen(['dot', '-V'], stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+    _PROC.communicate()
+    if _PROC.returncode != 0:
+        HAS_GRAPHVIZ = False
+    else:
+        HAS_GRAPHVIZ = True
+except Exception:  # pylint: disable=broad-except
+    # this is raised when the dot command cannot be found, which means GraphViz
+    # isn't installed
+    HAS_GRAPHVIZ = False
 
 
 class TestPassManagerDrawer(QiskitVisualizationTestCase):
@@ -56,8 +70,7 @@ class TestPassManagerDrawer(QiskitVisualizationTestCase):
         self.pass_manager.append(CXDirection(coupling_map))
         self.pass_manager.append(RemoveResetInZeroState())
 
-    @unittest.skipIf(not HAS_GRAPHVIZ,
-                     'Graphviz not installed.')
+    @unittest.skipIf(not HAS_GRAPHVIZ, 'Graphviz not installed.')
     def test_pass_manager_drawer_basic(self):
         """Test to see if the drawer draws a normal pass manager correctly"""
         filename = self._get_resource_path('current_standard.dot')
@@ -66,8 +79,7 @@ class TestPassManagerDrawer(QiskitVisualizationTestCase):
         self.assertFilesAreEqual(filename, path_to_diagram_reference('pass_manager_standard.dot'))
         os.remove(filename)
 
-    @unittest.skipIf(not HAS_GRAPHVIZ,
-                     'Graphviz not installed.')
+    @unittest.skipIf(not HAS_GRAPHVIZ, 'Graphviz not installed.')
     def test_pass_manager_drawer_style(self):
         """Test to see if the colours are updated when provided by the user"""
         # set colours for some passes, but leave others to take the default values
@@ -79,8 +91,7 @@ class TestPassManagerDrawer(QiskitVisualizationTestCase):
         filename = self._get_resource_path('current_style.dot')
         self.pass_manager.draw(filename=filename, style=style, raw=True)
 
-        self.assertFilesAreEqual(filename,
-                                 path_to_diagram_reference('pass_manager_style.dot'))
+        self.assertFilesAreEqual(filename, path_to_diagram_reference('pass_manager_style.dot'))
         os.remove(filename)
 
 

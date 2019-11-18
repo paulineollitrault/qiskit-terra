@@ -11,29 +11,28 @@
 # Any modifications or derivative works of this code must retain this
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
+
 """
 Visualization function for a pass manager. Passes are grouped based on their
 flow controller, and coloured based on the type of pass.
 """
+import os
 import inspect
-from qiskit.transpiler.basepasses import AnalysisPass, TransformationPass
-DEFAULT_STYLE = {AnalysisPass: 'red',
-                 TransformationPass: 'blue'}
-
+import tempfile
 
 try:
-    import subprocess
-    _PROC = subprocess.Popen(['dot', '-V'], stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-    _PROC.communicate()
-    if _PROC.returncode != 0:
-        HAS_GRAPHVIZ = False
-    else:
-        HAS_GRAPHVIZ = True
-except Exception:  # pylint: disable=broad-except
-    # this is raised when the dot command cannot be found, which means GraphViz
-    # isn't installed
-    HAS_GRAPHVIZ = False
+    from PIL import Image
+
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+from qiskit.visualization import utils
+from qiskit.visualization.exceptions import VisualizationError
+from qiskit.transpiler.basepasses import AnalysisPass, TransformationPass
+
+DEFAULT_STYLE = {AnalysisPass: 'red',
+                 TransformationPass: 'blue'}
 
 
 def pass_manager_drawer(pass_manager, filename, style=None, raw=False):
@@ -53,10 +52,52 @@ def pass_manager_drawer(pass_manager, filename, style=None, raw=False):
             the default dict
         raw (Bool) : True if you want to save the raw Dot output not an image. The
             default is False.
-
+    Returns:
+        PIL.Image or None: an in-memory representation of the pass manager. Or None if
+                           no image was generated or PIL is not installed.
     Raises:
         ImportError: when nxpd or pydot not installed.
+        VisualizationError: If raw=True and filename=None.
+
+    Example:
+        .. code-block::
+
+             %matplotlib inline
+            from qiskit import QuantumCircuit
+            from qiskit.compiler import transpile
+            from qiskit.transpiler import PassManager
+            from qiskit.visualization import pass_manager_drawer
+            from qiskit.transpiler.passes import Unroller
+
+            circ = QuantumCircuit(3)
+            circ.ccx(0, 1, 2)
+            circ.draw()
+
+            pass_ = Unroller(['u1', 'u2', 'u3', 'cx'])
+            pm = PassManager(pass_)
+            new_circ = pm.run(circ)
+            new_circ.draw(output='mpl')
+
+            pass_manager_drawer(pm, "passmanager.jpg")
     """
+
+    try:
+        import subprocess
+
+        _PROC = subprocess.Popen(['dot', '-V'],  # pylint: disable=invalid-name
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+        _PROC.communicate()
+        if _PROC.returncode != 0:
+            has_graphviz = False
+        else:
+            has_graphviz = True
+    except Exception:  # pylint: disable=broad-except
+        # this is raised when the dot command cannot be found, which means GraphViz
+        # isn't installed
+        has_graphviz = False
+
+    HAS_GRAPHVIZ = has_graphviz  # pylint: disable=invalid-name
 
     try:
         import pydot
@@ -83,13 +124,14 @@ def pass_manager_drawer(pass_manager, filename, style=None, raw=False):
 
     prev_node = None
 
-    for controller_group in passes:
+    for index, controller_group in enumerate(passes):
 
-        # label is the name of the flow controller (without the word controller)
-        label = controller_group['type'].__name__.replace('Controller', '')
+        # label is the name of the flow controller parameter
+        label = "[%s] %s" % (index, ', '.join(controller_group['flow_controllers']))
 
         # create the subgraph for this controller
-        subgraph = pydot.Cluster(str(component_id), label=label, fontname='helvetica')
+        subgraph = pydot.Cluster(str(component_id), label=label, fontname='helvetica',
+                                 labeljust='l')
         component_id += 1
 
         for pass_ in controller_group['passes']:
@@ -137,16 +179,33 @@ def pass_manager_drawer(pass_manager, filename, style=None, raw=False):
 
         graph.add_subgraph(subgraph)
 
-    if filename:
-        if not raw:
-            # linter says this isn't a method - it is
-            graph.write_png(filename)  # pylint: disable=no-member
-        else:
+    if raw:
+        if filename:
             graph.write(filename, format='raw')
+            return None
+        else:
+            raise VisualizationError("if format=raw, then a filename is required.")
+
+    if not HAS_PIL and filename:
+        # linter says this isn't a method - it is
+        graph.write_png(filename)  # pylint: disable=no-member
+        return None
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        tmppath = os.path.join(tmpdirname, 'pass_manager.png')
+
+        # linter says this isn't a method - it is
+        graph.write_png(tmppath)  # pylint: disable=no-member
+
+        image = Image.open(tmppath)
+        image = utils._trim(image)
+        os.remove(tmppath)
+        if filename:
+            image.save(filename, 'PNG')
+        return image
 
 
 def _get_node_color(pss, style):
-
     # look in the user provided dict first
     for typ, color in style.items():
         if isinstance(pss, typ):

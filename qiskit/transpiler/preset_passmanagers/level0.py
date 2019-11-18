@@ -32,6 +32,7 @@ from qiskit.transpiler.passes import FullAncillaAllocation
 from qiskit.transpiler.passes import EnlargeWithAncilla
 from qiskit.transpiler.passes import RemoveResetInZeroState
 from qiskit.transpiler.passes import ApplyLayout
+from qiskit.transpiler.passes import CheckCXDirection
 
 
 def level_0_pass_manager(transpile_config):
@@ -74,17 +75,19 @@ def level_0_pass_manager(transpile_config):
     # 4. Swap to fit the coupling map
     _swap_check = CheckMap(coupling_map)
 
+    _add_barrier = BarrierBeforeFinalMeasurements()
+
     def _swap_condition(property_set):
         return not property_set['is_swap_mapped']
 
-    _swap = [BarrierBeforeFinalMeasurements(),
-             StochasticSwap(coupling_map, trials=20, seed=seed_transpiler),
+    _swap = [StochasticSwap(coupling_map, trials=20, seed=seed_transpiler),
              Decompose(SwapGate)]
 
     # 5. Fix any bad CX directions
-    # _direction_check = CheckCXDirection(coupling_map)  # TODO
+    _direction_check = [CheckCXDirection(coupling_map)]
+
     def _direction_condition(property_set):
-        return not coupling_map.is_symmetric and not property_set['is_direction_mapped']
+        return not property_set['is_direction_mapped']
 
     _direction = [CXDirection(coupling_map)]
 
@@ -99,9 +102,11 @@ def level_0_pass_manager(transpile_config):
     pm0.append(_unroll)
     if coupling_map:
         pm0.append(_swap_check)
+        pm0.append(_add_barrier)
         pm0.append(_swap, condition=_swap_condition)
-        # pm0.append(_direction_check)  # TODO
-        pm0.append(_direction, condition=_direction_condition)
+        if not coupling_map.is_symmetric:
+            pm0.append(_direction_check)
+            pm0.append(_direction, condition=_direction_condition)
     pm0.append(_reset)
 
     return pm0

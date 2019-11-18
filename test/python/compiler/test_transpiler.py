@@ -17,22 +17,25 @@
 import math
 import unittest
 from unittest.mock import patch
+from ddt import ddt, data
 
-from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from qiskit import BasicAer
-from qiskit.extensions.standard import CnotGate
-from qiskit.transpiler import PassManager
+from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
+from qiskit.circuit import Parameter
 from qiskit.compiler import transpile
 from qiskit.converters import circuit_to_dag
+from qiskit.dagcircuit.exceptions import DAGCircuitError
+from qiskit.extensions.standard import CnotGate
 from qiskit.test import QiskitTestCase, Path
 from qiskit.test.mock import FakeMelbourne, FakeRueschlikon
-from qiskit.transpiler.passes import BarrierBeforeFinalMeasurements, CXDirection
 from qiskit.transpiler import Layout, CouplingMap
-from qiskit.circuit import Parameter
-from qiskit.dagcircuit.exceptions import DAGCircuitError
+from qiskit.transpiler import PassManager
 from qiskit.transpiler.exceptions import TranspilerError
+from qiskit.transpiler.passes import BarrierBeforeFinalMeasurements, CXDirection
+from qiskit.quantum_info import Operator
 
 
+@ddt
 class TestTranspile(QiskitTestCase):
     """Test transpile function."""
 
@@ -160,9 +163,9 @@ class TestTranspile(QiskitTestCase):
         qc.cx(qr[13], qr[4])
         qc.measure(qr, cr)
 
-        new_qc = transpile(qc, coupling_map=coupling_map, basis_gates=basis_gates)
-        cx_qubits = [qargs for (gate, qargs, _) in new_qc.data
-                     if gate.name == "cx"]
+        new_qc = transpile(qc, coupling_map=coupling_map, basis_gates=basis_gates,
+                           initial_layout=Layout.generate_trivial_layout(qr))
+        cx_qubits = [qargs for (gate, qargs, _) in new_qc.data if gate.name == "cx"]
         cx_qubits_physical = [[ctrl.index, tgt.index] for [ctrl, tgt] in cx_qubits]
         self.assertEqual(sorted(cx_qubits_physical),
                          [[3, 4], [3, 14], [5, 4], [9, 8], [12, 11], [13, 4]])
@@ -422,11 +425,48 @@ class TestTranspile(QiskitTestCase):
         theta = Parameter('theta')
         qc.rz(theta, qr[0])
 
-        transpiled_qc = transpile(qc, backend=FakeMelbourne())
+        transpiled_qc = transpile(qc, backend=FakeMelbourne(),
+                                  initial_layout=Layout.generate_trivial_layout(qr))
 
         qr = QuantumRegister(14, 'q')
         expected_qc = QuantumCircuit(qr)
         expected_qc.u1(theta, qr[0])
+
+        self.assertEqual(expected_qc, transpiled_qc)
+
+    def test_parameter_expression_circuit_for_simulator(self):
+        """Verify that a circuit including expressions of parameters can be
+        transpiled for a simulator backend."""
+        qr = QuantumRegister(2, name='qr')
+        qc = QuantumCircuit(qr)
+
+        theta = Parameter('theta')
+        square = theta * theta
+        qc.rz(square, qr[0])
+
+        transpiled_qc = transpile(qc, backend=BasicAer.get_backend('qasm_simulator'))
+
+        expected_qc = QuantumCircuit(qr)
+        expected_qc.u1(square, qr[0])
+
+        self.assertEqual(expected_qc, transpiled_qc)
+
+    def test_parameter_expression_circuit_for_device(self):
+        """Verify that a circuit including epxressions of parameters can be
+        transpiled for a device backend."""
+        qr = QuantumRegister(2, name='qr')
+        qc = QuantumCircuit(qr)
+
+        theta = Parameter('theta')
+        square = theta * theta
+        qc.rz(square, qr[0])
+
+        transpiled_qc = transpile(qc, backend=FakeMelbourne(),
+                                  initial_layout=Layout.generate_trivial_layout(qr))
+
+        qr = QuantumRegister(14, 'q')
+        expected_qc = QuantumCircuit(qr)
+        expected_qc.u1(square, qr[0])
 
         self.assertEqual(expected_qc, transpiled_qc)
 
@@ -599,3 +639,56 @@ class TestTranspile(QiskitTestCase):
 
         with self.assertRaises(TranspilerError):
             transpile(qc, coupling_map=cmap)
+
+    @data(0, 1, 2, 3)
+    def test_ms_unrolls_to_cx(self, optimization_level):
+        """Verify a Rx,Ry,Rxx circuit transpile to a U3,CX target."""
+
+        qc = QuantumCircuit(2)
+        qc.rx(math.pi/2, 0)
+        qc.ry(math.pi/4, 1)
+        qc.rxx(math.pi/4, 0, 1)
+
+        out = transpile(qc, basis_gates=['u3', 'cx'], optimization_level=optimization_level)
+
+        self.assertTrue(Operator(qc).equiv(out))
+
+    @data(0, 1, 2, 3)
+    def test_ms_can_target_ms(self, optimization_level):
+        """Verify a Rx,Ry,Rxx circuit can transpile to an Rx,Ry,Rxx target."""
+
+        qc = QuantumCircuit(2)
+        qc.rx(math.pi/2, 0)
+        qc.ry(math.pi/4, 1)
+        qc.rxx(math.pi/4, 0, 1)
+
+        out = transpile(qc, basis_gates=['rx', 'ry', 'rxx'], optimization_level=optimization_level)
+
+        self.assertTrue(Operator(qc).equiv(out))
+
+    @data(0, 1, 2, 3)
+    def test_cx_can_target_ms(self, optimization_level):
+        """Verify a U3,CX circuit can transpiler to a Rx,Ry,Rxx target."""
+
+        qc = QuantumCircuit(2)
+        qc.h(0)
+        qc.cx(0, 1)
+        qc.rz(math.pi/4, [0, 1])
+
+        out = transpile(qc, basis_gates=['rx', 'ry', 'rxx'], optimization_level=optimization_level)
+
+        self.assertTrue(Operator(qc).equiv(out))
+
+    @data(0, 1, 2, 3)
+    def test_measure_doesnt_unroll_ms(self, optimization_level):
+        """Verify a measure doesn't cause an Rx,Ry,Rxx circuit to unroll to U3,CX."""
+
+        qc = QuantumCircuit(2, 2)
+        qc.rx(math.pi/2, 0)
+        qc.ry(math.pi/4, 1)
+        qc.rxx(math.pi/4, 0, 1)
+        qc.measure([0, 1], [0, 1])
+
+        out = transpile(qc, basis_gates=['rx', 'ry', 'rxx'], optimization_level=optimization_level)
+
+        self.assertEqual(qc, out)

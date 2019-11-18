@@ -23,14 +23,13 @@ import numpy as np
 
 from qiskit.pulse.exceptions import PulseError
 from qiskit.pulse.channels import Channel
-from qiskit.pulse.timeslots import TimeslotCollection
 
 from .instruction import Instruction
 
 
 class MetaCount(ABCMeta):
     """Meta class to count class instances."""
-    def __new__(mcs, name, bases, namespace):
+    def __new__(mcs, name, bases, namespace, **_):
         new_cls = super(MetaCount, mcs).__new__(mcs, name, bases, namespace)
         new_cls.instances_counter = 0
         return new_cls
@@ -92,7 +91,6 @@ class Command(metaclass=MetaCount):
 
     @abstractmethod
     def to_instruction(self, command, *channels: List[Channel],
-                       timeslots: Optional[TimeslotCollection] = None,
                        name: Optional[str] = None) -> Instruction:
         """Create an instruction from command."""
         pass
@@ -111,15 +109,11 @@ class Command(metaclass=MetaCount):
         Returns:
             bool: are self and other equal
         """
-        if type(self) is type(other) and \
-                self._duration == other._duration and \
-                self._name == other._name:
-            return True
-        return False
+        return (type(self) is type(other)) and (self.duration == other.duration)
 
     def __hash__(self):
-        return hash((type(self), self._duration, self._name))
+        return hash((type(self), self.duration, self.name))
 
     def __repr__(self):
         return '%s(name=%s, duration=%d)' % (self.__class__.__name__,
-                                             self._name, self._duration)
+                                             self.name, self.duration)

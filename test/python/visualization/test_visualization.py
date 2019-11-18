@@ -12,15 +12,16 @@
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
 
+# pylint: disable=anomalous-backslash-in-string
+
 """Tests for visualization tools."""
 
 import os
 import logging
 import unittest
-from inspect import signature
-import numpy as np
 
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
+from qiskit.circuit import Qubit, Clbit
 from qiskit.visualization import utils
 from qiskit.visualization import circuit_drawer
 from qiskit.test import QiskitTestCase
@@ -31,60 +32,11 @@ logger = logging.getLogger(__name__)
 class TestLatexSourceGenerator(QiskitTestCase):
     """Qiskit latex source generator tests."""
 
-    def random_circuit(self, width=3, depth=3, max_operands=3):
-        """Generate random circuit of arbitrary size.
-        Note: the depth is the layers of independent operation. true depth
-        in the image may be more for visualization purposes, if gates overlap.
-
-        Args:
-            width (int): number of quantum wires
-            depth (int): layers of operations
-            max_operands (int): maximum operands of each gate
-
-        Returns:
-            QuantumCircuit: constructed circuit
-        """
-        qr = QuantumRegister(width, "q")
-        qc = QuantumCircuit(qr)
-
-        one_q_ops = "iden,u0,u1,u2,u3,x,y,z,h,s,sdg,t,tdg,rx,ry,rz"
-        two_q_ops = "cx,cy,cz,ch,crz,cu1,cu3,swap"
-        three_q_ops = "ccx"
-
-        seed = np.random.randint(0, np.iinfo(np.int32).max)
-        logger.debug("random_circuit RandomState seeded with seed=%s", seed)
-        rng = np.random.RandomState(seed)
-        # apply arbitrary random operations at every depth
-        for _ in range(depth):
-            # choose either 1, 2, or 3 qubits for the operation
-            remaining_qubits = list(range(width))
-            while remaining_qubits:
-                max_possible_operands = min(len(remaining_qubits), max_operands)
-                num_operands = rng.choice(range(max_possible_operands)) + 1
-                rng.shuffle(remaining_qubits)
-                operands = remaining_qubits[:num_operands]
-                remaining_qubits = [q for q in remaining_qubits if q not in operands]
-                if num_operands == 1:
-                    operation = rng.choice(one_q_ops.split(','))
-                elif num_operands == 2:
-                    operation = rng.choice(two_q_ops.split(','))
-                elif num_operands == 3:
-                    operation = rng.choice(three_q_ops.split(','))
-                # every gate is defined as a method of the QuantumCircuit class
-                # the code below is so we can call a gate by its name
-                gate = getattr(QuantumCircuit, operation)
-                op_args = list(signature(gate).parameters.keys())
-                num_angles = len(op_args) - num_operands - 1  # -1 for the 'self' arg
-                angles = [rng.uniform(0, 3.14) for x in range(num_angles)]
-                register_operands = [qr[i] for i in operands]
-                gate(qc, *angles, *register_operands)
-
-        return qc
-
     def test_tiny_circuit(self):
         """Test draw tiny circuit."""
         filename = self._get_resource_path('test_tiny.tex')
-        qc = self.random_circuit(1, 1, 1)
+        qc = QuantumCircuit(1)
+        qc.h(0)
         try:
             circuit_drawer(qc, filename=filename, output='latex_source')
             self.assertNotEqual(os.path.exists(filename), False)
@@ -95,7 +47,9 @@ class TestLatexSourceGenerator(QiskitTestCase):
     def test_normal_circuit(self):
         """Test draw normal size circuit."""
         filename = self._get_resource_path('test_normal.tex')
-        qc = self.random_circuit(5, 5, 3)
+        qc = QuantumCircuit(5)
+        for qubit in range(5):
+            qc.h(qubit)
         try:
             circuit_drawer(qc, filename=filename, output='latex_source')
             self.assertNotEqual(os.path.exists(filename), False)
@@ -106,7 +60,9 @@ class TestLatexSourceGenerator(QiskitTestCase):
     def test_wide_circuit(self):
         """Test draw wide circuit."""
         filename = self._get_resource_path('test_wide.tex')
-        qc = self.random_circuit(100, 1, 1)
+        qc = QuantumCircuit(100)
+        for gate in range(100):
+            qc.h(gate)
         try:
             circuit_drawer(qc, filename=filename, output='latex_source')
             self.assertNotEqual(os.path.exists(filename), False)
@@ -117,7 +73,9 @@ class TestLatexSourceGenerator(QiskitTestCase):
     def test_deep_circuit(self):
         """Test draw deep circuit."""
         filename = self._get_resource_path('test_deep.tex')
-        qc = self.random_circuit(1, 100, 1)
+        qc = QuantumCircuit(1)
+        for _ in range(100):
+            qc.h(0)
         try:
             circuit_drawer(qc, filename=filename, output='latex_source')
             self.assertNotEqual(os.path.exists(filename), False)
@@ -128,7 +86,10 @@ class TestLatexSourceGenerator(QiskitTestCase):
     def test_huge_circuit(self):
         """Test draw huge circuit."""
         filename = self._get_resource_path('test_huge.tex')
-        qc = self.random_circuit(40, 40, 1)
+        qc = QuantumCircuit(40)
+        for qubit in range(39):
+            qc.h(qubit)
+            qc.cx(qubit, 39)
         try:
             circuit_drawer(qc, filename=filename, output='latex_source')
             self.assertNotEqual(os.path.exists(filename), False)
@@ -191,18 +152,18 @@ class TestVisualizationUtils(QiskitTestCase):
         """ _get_layered_instructions without reverse_bits """
         (qregs, cregs, layered_ops) = utils._get_layered_instructions(self.circuit)
 
-        exp = [[('cx', [(QuantumRegister(2, 'qr2'), 0), (QuantumRegister(2, 'qr2'), 1)], []),
-                ('cx', [(QuantumRegister(2, 'qr1'), 0), (QuantumRegister(2, 'qr1'), 1)], [])],
-               [('measure', [(QuantumRegister(2, 'qr2'), 0)], [(ClassicalRegister(2, 'cr2'), 0)])],
-               [('measure', [(QuantumRegister(2, 'qr1'), 0)], [(ClassicalRegister(2, 'cr1'), 0)])],
-               [('cx', [(QuantumRegister(2, 'qr2'), 1), (QuantumRegister(2, 'qr2'), 0)], []),
-                ('cx', [(QuantumRegister(2, 'qr1'), 1), (QuantumRegister(2, 'qr1'), 0)], [])],
-               [('measure', [(QuantumRegister(2, 'qr2'), 1)], [(ClassicalRegister(2, 'cr2'), 1)])],
-               [('measure', [(QuantumRegister(2, 'qr1'), 1)], [(ClassicalRegister(2, 'cr1'), 1)])]
+        exp = [[('cx', [self.qr2[0], self.qr2[1]], []),
+                ('cx', [self.qr1[0], self.qr1[1]], [])],
+               [('measure', [self.qr2[0]], [self.cr2[0]])],
+               [('measure', [self.qr1[0]], [self.cr1[0]])],
+               [('cx', [self.qr2[1], self.qr2[0]], []),
+                ('cx', [self.qr1[1], self.qr1[0]], [])],
+               [('measure', [self.qr2[1]], [self.cr2[1]])],
+               [('measure', [self.qr1[1]], [self.cr1[1]])]
                ]
 
-        self.assertEqual([(self.qr1, 0), (self.qr1, 1), (self.qr2, 0), (self.qr2, 1)], qregs)
-        self.assertEqual([(self.cr1, 0), (self.cr1, 1), (self.cr2, 0), (self.cr2, 1)], cregs)
+        self.assertEqual([self.qr1[0], self.qr1[1], self.qr2[0], self.qr2[1]], qregs)
+        self.assertEqual([self.cr1[0], self.cr1[1], self.cr2[0], self.cr2[1]], cregs)
         self.assertEqual(exp,
                          [[(op.name, op.qargs, op.cargs) for op in ops] for ops in layered_ops])
 
@@ -211,18 +172,18 @@ class TestVisualizationUtils(QiskitTestCase):
         (qregs, cregs, layered_ops) = utils._get_layered_instructions(self.circuit,
                                                                       reverse_bits=True)
 
-        exp = [[('cx', [(QuantumRegister(2, 'qr2'), 0), (QuantumRegister(2, 'qr2'), 1)], []),
-                ('cx', [(QuantumRegister(2, 'qr1'), 0), (QuantumRegister(2, 'qr1'), 1)], [])],
-               [('measure', [(QuantumRegister(2, 'qr2'), 0)], [(ClassicalRegister(2, 'cr2'), 0)])],
-               [('measure', [(QuantumRegister(2, 'qr1'), 0)], [(ClassicalRegister(2, 'cr1'), 0)])],
-               [('cx', [(QuantumRegister(2, 'qr2'), 1), (QuantumRegister(2, 'qr2'), 0)], []),
-                ('cx', [(QuantumRegister(2, 'qr1'), 1), (QuantumRegister(2, 'qr1'), 0)], [])],
-               [('measure', [(QuantumRegister(2, 'qr2'), 1)], [(ClassicalRegister(2, 'cr2'), 1)])],
-               [('measure', [(QuantumRegister(2, 'qr1'), 1)], [(ClassicalRegister(2, 'cr1'), 1)])]
+        exp = [[('cx', [self.qr2[0], self.qr2[1]], []),
+                ('cx', [self.qr1[0], self.qr1[1]], [])],
+               [('measure', [self.qr2[0]], [self.cr2[0]])],
+               [('measure', [self.qr1[0]], [self.cr1[0]])],
+               [('cx', [self.qr2[1], self.qr2[0]], []),
+                ('cx', [self.qr1[1], self.qr1[0]], [])],
+               [('measure', [self.qr2[1]], [self.cr2[1]])],
+               [('measure', [self.qr1[1]], [self.cr1[1]])]
                ]
 
-        self.assertEqual([(self.qr2, 1), (self.qr2, 0), (self.qr1, 1), (self.qr1, 0)], qregs)
-        self.assertEqual([(self.cr2, 1), (self.cr2, 0), (self.cr1, 1), (self.cr1, 0)], cregs)
+        self.assertEqual([self.qr2[1], self.qr2[0], self.qr1[1], self.qr1[0]], qregs)
+        self.assertEqual([self.cr2[1], self.cr2[0], self.cr1[1], self.cr1[0]], cregs)
         self.assertEqual(exp,
                          [[(op.name, op.qargs, op.cargs) for op in ops] for ops in layered_ops])
 
@@ -259,6 +220,211 @@ class TestVisualizationUtils(QiskitTestCase):
         self.assertEqual([cr1[0], cr1[1], cr2[0], cr2[1]], cregs)
         self.assertEqual(exp,
                          [[(op.name, op.qargs, op.cargs) for op in ops] for ops in layered_ops])
+
+    def test_get_layered_instructions_left_justification_simple(self):
+        """ Test _get_layered_instructions left justification simple since #2802
+q_0: |0>───────■──
+        ┌───┐  │
+q_1: |0>┤ H ├──┼──
+        ├───┤  │
+q_2: |0>┤ H ├──┼──
+        └───┘┌─┴─┐
+q_3: |0>─────┤ X ├
+             └───┘
+"""
+        qc = QuantumCircuit(4)
+        qc.h(1)
+        qc.h(2)
+        qc.cx(0, 3)
+
+        (_, _, layered_ops) = utils._get_layered_instructions(qc, justify='left')
+
+        l_exp = [[('h', [Qubit(QuantumRegister(4, 'q'), 1)], []),
+                  ('h', [Qubit(QuantumRegister(4, 'q'), 2)], [])],
+                 [('cx', [Qubit(QuantumRegister(4, 'q'), 0),
+                          Qubit(QuantumRegister(4, 'q'), 3)], [])
+                  ]
+                 ]
+
+        self.assertEqual(l_exp,
+                         [[(op.name, op.qargs, op.cargs) for op in ops] for ops in layered_ops])
+
+    def test_get_layered_instructions_right_justification_simple(self):
+        """ Test _get_layered_instructions right justification simple since #2802
+q_0: |0>──■───────
+          │  ┌───┐
+q_1: |0>──┼──┤ H ├
+          │  ├───┤
+q_2: |0>──┼──┤ H ├
+        ┌─┴─┐└───┘
+q_3: |0>┤ X ├─────
+        └───┘
+"""
+        qc = QuantumCircuit(4)
+        qc.h(1)
+        qc.h(2)
+        qc.cx(0, 3)
+
+        (_, _, layered_ops) = utils._get_layered_instructions(qc, justify='right')
+
+        r_exp = [[('cx', [Qubit(QuantumRegister(4, 'q'), 0),
+                          Qubit(QuantumRegister(4, 'q'), 3)], [])],
+                 [('h', [Qubit(QuantumRegister(4, 'q'), 1)], []),
+                  ('h', [Qubit(QuantumRegister(4, 'q'), 2)], [])
+                  ]
+                 ]
+
+        self.assertEqual(r_exp,
+                         [[(op.name, op.qargs, op.cargs) for op in ops] for ops in layered_ops])
+
+    def test_get_layered_instructions_left_justification_less_simple(self):
+        """ Test _get_layered_instructions left justification
+        less simple example since #2802
+        ┌────────────┐┌───┐┌────────────┐              ┌─┐┌────────────┐┌───┐┌────────────┐
+q_0: |0>┤ U2(0,pi/1) ├┤ X ├┤ U2(0,pi/1) ├──────────────┤M├┤ U2(0,pi/1) ├┤ X ├┤ U2(0,pi/1) ├
+        ├────────────┤└─┬─┘├────────────┤┌────────────┐└╥┘└────────────┘└─┬─┘├────────────┤
+q_1: |0>┤ U2(0,pi/1) ├──■──┤ U2(0,pi/1) ├┤ U2(0,pi/1) ├─╫─────────────────■──┤ U2(0,pi/1) ├
+        └────────────┘     └────────────┘└────────────┘ ║                    └────────────┘
+q_2: |0>────────────────────────────────────────────────╫──────────────────────────────────
+                                                        ║
+q_3: |0>────────────────────────────────────────────────╫──────────────────────────────────
+                                                        ║
+q_4: |0>────────────────────────────────────────────────╫──────────────────────────────────
+                                                        ║
+c1_0: 0 ════════════════════════════════════════════════╩══════════════════════════════════
+        """
+        qasm = """
+        OPENQASM 2.0;
+        include "qelib1.inc";
+        qreg q[5];
+        creg c1[1];
+        u2(0,3.14159265358979) q[0];
+        u2(0,3.14159265358979) q[1];
+        cx q[1],q[0];
+        u2(0,3.14159265358979) q[0];
+        u2(0,3.14159265358979) q[1];
+        u2(0,3.14159265358979) q[1];
+        measure q[0] -> c1[0];
+        u2(0,3.14159265358979) q[0];
+        cx q[1],q[0];
+        u2(0,3.14159265358979) q[0];
+        u2(0,3.14159265358979) q[1];
+        """
+        qc = QuantumCircuit.from_qasm_str(qasm)
+
+        (_, _, layered_ops) = utils._get_layered_instructions(qc, justify='left')
+
+        l_exp = [[('u2', [Qubit(QuantumRegister(5, 'q'), 0)], []),
+                  ('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])],
+                 [('cx',
+                   [Qubit(QuantumRegister(5, 'q'), 1), Qubit(QuantumRegister(5, 'q'), 0)],
+                   [])],
+                 [('u2', [Qubit(QuantumRegister(5, 'q'), 0)], []),
+                  ('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])],
+                 [('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])],
+                 [('measure',
+                   [Qubit(QuantumRegister(5, 'q'), 0)],
+                   [Clbit(ClassicalRegister(1, 'c1'), 0)])],
+                 [('u2', [Qubit(QuantumRegister(5, 'q'), 0)], [])],
+                 [('cx',
+                   [Qubit(QuantumRegister(5, 'q'), 1), Qubit(QuantumRegister(5, 'q'), 0)],
+                   [])],
+                 [('u2', [Qubit(QuantumRegister(5, 'q'), 0)], []),
+                  ('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])]]
+
+        self.assertEqual(l_exp,
+                         [[(op.name, op.qargs, op.cargs) for op in ops] for ops in layered_ops])
+
+    def test_get_layered_instructions_right_justification_less_simple(self):
+        """ Test _get_layered_instructions right justification
+        less simple example since #2802
+        ┌────────────┐┌───┐┌────────────┐┌─┐┌────────────┐┌───┐┌────────────┐
+q_0: |0>┤ U2(0,pi/1) ├┤ X ├┤ U2(0,pi/1) ├┤M├┤ U2(0,pi/1) ├┤ X ├┤ U2(0,pi/1) ├
+        ├────────────┤└─┬─┘├────────────┤└╥┘├────────────┤└─┬─┘├────────────┤
+q_1: |0>┤ U2(0,pi/1) ├──■──┤ U2(0,pi/1) ├─╫─┤ U2(0,pi/1) ├──■──┤ U2(0,pi/1) ├
+        └────────────┘     └────────────┘ ║ └────────────┘     └────────────┘
+q_2: |0>──────────────────────────────────╫──────────────────────────────────
+                                          ║
+q_3: |0>──────────────────────────────────╫──────────────────────────────────
+                                          ║
+q_4: |0>──────────────────────────────────╫──────────────────────────────────
+                                          ║
+c1_0: 0 ══════════════════════════════════╩══════════════════════════════════
+        """
+        qasm = """
+        OPENQASM 2.0;
+        include "qelib1.inc";
+        qreg q[5];
+        creg c1[1];
+        u2(0,3.14159265358979) q[0];
+        u2(0,3.14159265358979) q[1];
+        cx q[1],q[0];
+        u2(0,3.14159265358979) q[0];
+        u2(0,3.14159265358979) q[1];
+        u2(0,3.14159265358979) q[1];
+        measure q[0] -> c1[0];
+        u2(0,3.14159265358979) q[0];
+        cx q[1],q[0];
+        u2(0,3.14159265358979) q[0];
+        u2(0,3.14159265358979) q[1];
+        """
+        qc = QuantumCircuit.from_qasm_str(qasm)
+
+        (_, _, layered_ops) = utils._get_layered_instructions(qc, justify='right')
+
+        r_exp = [[('u2', [Qubit(QuantumRegister(5, 'q'), 0)], []),
+                  ('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])],
+                 [('cx',
+                   [Qubit(QuantumRegister(5, 'q'), 1), Qubit(QuantumRegister(5, 'q'), 0)],
+                   [])],
+                 [('u2', [Qubit(QuantumRegister(5, 'q'), 0)], []),
+                  ('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])],
+                 [('measure',
+                   [Qubit(QuantumRegister(5, 'q'), 0)],
+                   [Clbit(ClassicalRegister(1, 'c1'), 0)])],
+                 [('u2', [Qubit(QuantumRegister(5, 'q'), 0)], []),
+                  ('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])],
+                 [('cx',
+                   [Qubit(QuantumRegister(5, 'q'), 1), Qubit(QuantumRegister(5, 'q'), 0)],
+                   [])],
+                 [('u2', [Qubit(QuantumRegister(5, 'q'), 0)], []),
+                  ('u2', [Qubit(QuantumRegister(5, 'q'), 1)], [])]]
+
+        self.assertEqual(r_exp,
+                         [[(op.name, op.qargs, op.cargs) for op in ops] for ops in layered_ops])
+
+    def test_generate_latex_label_nomathmode(self):
+        """Test generate latex label default."""
+        self.assertEqual('abc', utils.generate_latex_label('abc'))
+
+    def test_generate_latex_label_nomathmode_utf8char(self):
+        """Test generate latex label utf8 characters."""
+        self.assertEqual('{\\ensuremath{\\iiint}}X{\\ensuremath{\\forall}}Y',
+                         utils.generate_latex_label('∭X∀Y'))
+
+    def test_generate_latex_label_mathmode_utf8char(self):
+        """Test generate latex label mathtext with utf8."""
+        self.assertEqual(
+            'abc_{\\ensuremath{\\iiint}}X{\\ensuremath{\\forall}}Y',
+            utils.generate_latex_label('$abc_$∭X∀Y'))
+
+    def test_generate_latex_label_mathmode_underscore_outside(self):
+        """Test generate latex label with underscore outside mathmode."""
+        self.assertEqual(
+            'abc{\\_}{\\ensuremath{\\iiint}}X{\\ensuremath{\\forall}}Y',
+            utils.generate_latex_label('$abc$_∭X∀Y'))
+
+    def test_generate_latex_label_escaped_dollar_signs(self):
+        """Test generate latex label with escaped dollarsign."""
+        self.assertEqual(
+            '{\\$}{\\ensuremath{\\forall}}{\\$}',
+            utils.generate_latex_label('\$∀\$'))  # noqa
+
+    def test_generate_latex_label_escaped_dollar_sign_in_mathmode(self):
+        """Test generate latex label with escaped dollar sign in mathmode."""
+        self.assertEqual(
+            'a$bc{\\_}{\\ensuremath{\\iiint}}X{\\ensuremath{\\forall}}Y',
+            utils.generate_latex_label('$a$bc$_∭X∀Y'))  # noqa
 
 
 if __name__ == '__main__':

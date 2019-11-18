@@ -15,13 +15,14 @@
 """
 Instruction = Leaf node of schedule.
 """
+import warnings
+
 from typing import Tuple, List, Iterable, Callable, Optional
 
 from qiskit.pulse.channels import Channel
 from qiskit.pulse.interfaces import ScheduleComponent
 from qiskit.pulse.schedule import Schedule
 from qiskit.pulse.timeslots import Interval, Timeslot, TimeslotCollection
-from qiskit.pulse.exceptions import PulseError
 
 # pylint: disable=missing-return-doc,missing-type-doc
 
@@ -30,35 +31,23 @@ class Instruction(ScheduleComponent):
     """An abstract class for leaf nodes of schedule."""
 
     def __init__(self, command, *channels: List[Channel],
-                 timeslots: Optional[TimeslotCollection] = None,
                  name: Optional[str] = None):
-        """
+        """Instruction initializer.
+
         Args:
             command: Pulse command to schedule
             *channels: List of pulse channels to schedule with command
-            timeslots: Optional list of timeslots. If channels are supplied timeslots
-                cannot also be given
             name: Name of Instruction
-
-        Raises:
-            PulseError: If both channels and timeslots are supplied
         """
         self._command = command
         self._name = name if name else self._command.name
 
-        if timeslots and channels:
-            raise PulseError('Channels and timeslots may not both be supplied.')
+        duration = command.duration
 
-        if not timeslots:
-            duration = command.duration
-            self._timeslots = TimeslotCollection(*(Timeslot(Interval(0, duration), channel)
-                                                   for channel in channels))
-        else:
-            self._timeslots = timeslots
+        self._timeslots = TimeslotCollection(*(Timeslot(Interval(0, duration), channel)
+                                               for channel in channels))
 
         channels = self.channels
-
-        self._buffer = max(chan.buffer for chan in channels) if channels else 0
 
     @property
     def name(self) -> str:
@@ -97,11 +86,6 @@ class Instruction(ScheduleComponent):
     def duration(self) -> int:
         """Duration of this instruction."""
         return self.timeslots.duration
-
-    @property
-    def buffer(self) -> int:
-        """Buffer for schedule. To be used when appending"""
-        return self._buffer
 
     @property
     def _children(self) -> Tuple[ScheduleComponent]:
@@ -185,11 +169,11 @@ class Instruction(ScheduleComponent):
             buffer: Whether to obey buffer when inserting
             name: Name of the new schedule. Defaults to name of self
         """
-        if buffer and schedule.buffer and start_time > 0:
-            start_time += self.buffer
+        if buffer:
+            warnings.warn("Buffers are no longer supported. Please use an explicit Delay.")
         return self.union((start_time, schedule), name=name)
 
-    def append(self, schedule: ScheduleComponent, buffer: bool = True,
+    def append(self, schedule: ScheduleComponent, buffer: bool = False,
                name: Optional[str] = None) -> 'Schedule':
         """Return a new schedule with `schedule` inserted at the maximum time over
         all channels shared between `self` and `schedule`.
@@ -199,16 +183,19 @@ class Instruction(ScheduleComponent):
             buffer: Whether to obey buffer when appending
             name: Name of the new schedule. Defaults to name of self
         """
+        if buffer:
+            warnings.warn("Buffers are no longer supported. Please use an explicit Delay.")
         common_channels = set(self.channels) & set(schedule.channels)
         time = self.ch_stop_time(*common_channels)
-        return self.insert(time, schedule, buffer=buffer, name=name)
+        return self.insert(time, schedule, name=name)
 
     def draw(self, dt: float = 1, style: Optional['SchedStyle'] = None,
              filename: Optional[str] = None, interp_method: Optional[Callable] = None,
              scaling: float = 1, channels_to_plot: Optional[List[Channel]] = None,
              plot_all: bool = False, plot_range: Optional[Tuple[float]] = None,
              interactive: bool = False, table: bool = True,
-             label: bool = False, framechange: bool = True):
+             label: bool = False, framechange: bool = True,
+             channels: Optional[List[Channel]] = None):
         """Plot the instruction.
 
         Args:
@@ -217,7 +204,7 @@ class Instruction(ScheduleComponent):
             filename: Name required to save pulse image
             interp_method: A function for interpolation
             scaling: Relative visual scaling of waveform amplitudes
-            channels_to_plot: A list of channel names to plot
+            channels_to_plot: Deprecated, see `channels`
             plot_all: Plot empty channels
             plot_range: A tuple of time range to plot
             interactive: When set true show the circuit in a new window
@@ -225,6 +212,7 @@ class Instruction(ScheduleComponent):
             table: Draw event table for supported commands
             label: Label individual instructions
             framechange: Add framechange indicators
+            channels: A list of channel names to plot
 
 
         Returns:
@@ -234,24 +222,39 @@ class Instruction(ScheduleComponent):
 
         from qiskit import visualization
 
+        if channels_to_plot:
+            warnings.warn('The parameter "channels_to_plot" is being replaced by "channels"',
+                          DeprecationWarning, 3)
+            channels = channels_to_plot
+
         return visualization.pulse_drawer(self, dt=dt, style=style,
                                           filename=filename, interp_method=interp_method,
-                                          scaling=scaling, channels_to_plot=channels_to_plot,
-                                          plot_all=plot_all, plot_range=plot_range,
-                                          interactive=interactive, table=table,
-                                          label=label, framechange=framechange)
+                                          scaling=scaling, plot_all=plot_all,
+                                          plot_range=plot_range, interactive=interactive,
+                                          table=table, label=label,
+                                          framechange=framechange, channels=channels)
 
-    def __add__(self, schedule: ScheduleComponent) -> 'Schedule':
-        """Return a new schedule with `schedule` inserted within `self` at `start_time`."""
-        return self.append(schedule)
+    def __eq__(self, other: 'Instruction'):
+        """Check if this Instruction is equal to the `other` instruction.
 
-    def __or__(self, schedule: ScheduleComponent) -> 'Schedule':
-        """Return a new schedule which is the union of `self` and `schedule`."""
-        return self.union(schedule)
+        Equality is determined by the instruction sharing the same command and channels.
+        """
+        return (self.command == other.command) and (set(self.channels) == set(other.channels))
+
+    def __hash__(self):
+        return hash((self.command.__hash__(), self.channels.__hash__()))
+
+    def __add__(self, other: ScheduleComponent) -> 'Schedule':
+        """Return a new schedule with `other` inserted within `self` at `start_time`."""
+        return self.append(other)
+
+    def __or__(self, other: ScheduleComponent) -> 'Schedule':
+        """Return a new schedule which is the union of `self` and `other`."""
+        return self.union(other)
 
     def __lshift__(self, time: int) -> 'Schedule':
         """Return a new schedule which is shifted forward by `time`."""
         return self.shift(time)
 
     def __repr__(self):
-        return "%s" % (self._command)
+        return "Instruction(%s, %s)" % (self._command, ', '.join(str(ch) for ch in self.channels))
