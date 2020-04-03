@@ -143,7 +143,7 @@ class NoiseAdaptiveLayout(AnalysisPass):
         for q in dag.qubits():
             self.qarg_to_id[q.register.name + str(q.index)] = idx
             idx += 1
-        for gate in dag.twoQ_gates():
+        for gate in dag.two_qubit_ops():
             qid1 = self._qarg_to_id(gate.qargs[0])
             qid2 = self._qarg_to_id(gate.qargs[1])
             min_q = min(qid1, qid2)
@@ -208,9 +208,13 @@ class NoiseAdaptiveLayout(AnalysisPass):
         num_qubits = self._create_program_graph(dag)
         if num_qubits > len(self.swap_graph):
             raise TranspilerError('Number of qubits greater than device.')
-        for end1, end2, _ in sorted(self.prog_graph.edges(data=True),
-                                    key=lambda x: x[2]['weight'], reverse=True):
-            self.pending_program_edges.append((end1, end2))
+
+        # sort by weight, then edge name for determinism (since networkx on python 3.5 returns
+        # different order of edges)
+        self.pending_program_edges = sorted(self.prog_graph.edges(data=True),
+                                            key=lambda x: [x[2]['weight'], -x[0], -x[1]],
+                                            reverse=True)
+
         while self.pending_program_edges:
             edge = self._select_next_edge()
             q1_mapped = edge[0] in self.prog2hw

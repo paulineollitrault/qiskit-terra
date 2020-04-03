@@ -11,7 +11,6 @@
 # Any modifications or derivative works of this code must retain this
 # copyright notice, and modified files need to carry a notice indicating
 # that they have been altered from the originals.
-
 """
 ================================================
 Quantum Information (:mod:`qiskit.quantum_info`)
@@ -26,9 +25,14 @@ Operators
    :toctree: ../stubs/
 
    Operator
+   Clifford
+   ScalarOp
    Pauli
    pauli_group
    Quaternion
+   PauliTable
+   StabilizerTable
+   pauli_basis
 
 States
 ======
@@ -59,6 +63,24 @@ Measures
    :toctree: ../stubs/
 
    state_fidelity
+   purity
+   average_gate_fidelity
+   process_fidelity
+   gate_error
+   purity
+   concurrence
+   entropy
+   entanglement_of_formation
+   mutual_information
+
+Utility Functions
+=================
+
+.. autosummary::
+   :toctree: ../stubs/
+
+   partial_trace
+   shannon_entropy
 
 Random
 ======
@@ -66,9 +88,12 @@ Random
 .. autosummary::
    :toctree: ../stubs/
 
-   random_unitary
-   random_state
+   random_statevector
    random_density_matrix
+   random_unitary
+   random_hermitian
+   random_quantum_channel
+   random_state
 
 Analysis
 =========
@@ -84,21 +109,31 @@ Synthesis
 .. autosummary::
    :toctree: ../stubs/
 
-   euler_angles_1q
-   two_qubit_cnot_decompose
+   OneQubitEulerDecomposer
    TwoQubitBasisDecomposer
-
+   two_qubit_cnot_decompose
+   euler_angles_1q
 """
 
-from .operators.operator import Operator
+from .operators import Operator, ScalarOp
 from .operators.pauli import Pauli, pauli_group
 from .operators.quaternion import Quaternion
 from .operators.channel import Choi, SuperOp, Kraus, Stinespring, Chi, PTM
 from .operators.measures import process_fidelity
+from .operators import average_gate_fidelity
+from .operators import gate_error
+from .operators.symplectic import Clifford, PauliTable, StabilizerTable
+from .operators.symplectic import pauli_basis
+
 from .states import Statevector, DensityMatrix
-from .states.states import basis_state, projector, purity
-from .states.measures import state_fidelity
-from .random import random_unitary, random_state, random_density_matrix
-from .synthesis import (TwoQubitBasisDecomposer, euler_angles_1q,
-                        two_qubit_cnot_decompose)
+from .states import (partial_trace, state_fidelity, purity, entropy,
+                     concurrence, entanglement_of_formation,
+                     mutual_information, shannon_entropy)
+from .states.states import basis_state, projector
+
+from .random import (random_quantum_channel, random_unitary,
+                     random_hermitian, random_statevector,
+                     random_density_matrix, random_state)
+from .synthesis import (OneQubitEulerDecomposer, TwoQubitBasisDecomposer,
+                        two_qubit_cnot_decompose, euler_angles_1q)
 from .analysis import hellinger_fidelity
