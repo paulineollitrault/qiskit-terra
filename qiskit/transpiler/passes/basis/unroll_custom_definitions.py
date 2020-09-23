@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # This code is part of Qiskit.
 #
 # (C) Copyright IBM 2017, 2020.
@@ -14,9 +12,10 @@
 
 """Unrolls instructions with custom definitions."""
 
-from qiskit.dagcircuit import DAGCircuit
 from qiskit.exceptions import QiskitError
 from qiskit.transpiler.basepasses import TransformationPass
+from qiskit.circuit import ControlledGate
+from qiskit.converters.circuit_to_dag import circuit_to_dag
 
 
 class UnrollCustomDefinitions(TransformationPass):
@@ -53,18 +52,30 @@ class UnrollCustomDefinitions(TransformationPass):
         if self._basis_gates is None:
             return dag
 
-        basic_insts = set(('measure', 'reset', 'barrier', 'snapshot'))
+        basic_insts = {'measure', 'reset', 'barrier', 'snapshot'}
         device_insts = basic_insts | set(self._basis_gates)
 
         for node in dag.op_nodes():
 
+            if dag.calibrations and node.name in dag.calibrations:
+                qubit = tuple([node.qargs[0].index])
+                params = tuple(node.op.params)
+                if (qubit, params) in dag.calibrations[node.name]:
+                    continue
+
             if node.name in device_insts or self._equiv_lib.has_entry(node.op):
-                continue
+                if isinstance(node.op, ControlledGate) and node.op._open_ctrl:
+                    pass
+                else:
+                    continue
 
             try:
-                rule = node.op.definition
+                rule = node.op.definition.data
             except TypeError as err:
                 raise QiskitError('Error decomposing node {}: {}'.format(node.name, err))
+            except AttributeError:
+                # definition is None
+                rule = None
 
             if not rule:
                 if rule == []:
@@ -76,19 +87,7 @@ class UnrollCustomDefinitions(TransformationPass):
                                   "Instruction %s not found in equivalence library "
                                   "and no rule found to expand." %
                                   (str(self._basis_gates), node.op.name))
-
-            # hacky way to build a dag on the same register as the rule is defined
-            # TODO: need anonymous rules to address wires by index
-            decomposition = DAGCircuit()
-            qregs = {qb.register for inst in rule for qb in inst[1]}
-            cregs = {cb.register for inst in rule for cb in inst[2]}
-            for qreg in qregs:
-                decomposition.add_qreg(qreg)
-            for creg in cregs:
-                decomposition.add_creg(creg)
-            for inst in rule:
-                decomposition.apply_operation_back(*inst)
-
+            decomposition = circuit_to_dag(node.op.definition)
             unrolled_dag = UnrollCustomDefinitions(self._equiv_lib,
                                                    self._basis_gates).run(
                                                        decomposition)

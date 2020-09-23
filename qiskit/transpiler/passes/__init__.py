@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # This code is part of Qiskit.
 #
 # (C) Copyright IBM 2017, 2018.
@@ -29,6 +27,7 @@ Layout Selection (Placement)
    TrivialLayout
    DenseLayout
    NoiseAdaptiveLayout
+   SabreLayout
    CSPLayout
    ApplyLayout
    Layout2qDistance
@@ -44,6 +43,7 @@ Routing
    BasicSwap
    LookaheadSwap
    StochasticSwap
+   SabreSwap
 
 Basis Change
 ============
@@ -72,6 +72,7 @@ Optimizations
    RemoveDiagonalGatesBeforeMeasure
    RemoveResetInZeroState
    CrosstalkAdaptiveSchedule
+   TemplateOptimization
 
 Circuit Analysis
 ================
@@ -86,6 +87,14 @@ Circuit Analysis
    CountOpsLongestPath
    NumTensorFactors
    DAGLongestPath
+
+Synthesis
+=============
+
+.. autosummary::
+   :toctree: ../stubs/
+
+   UnitarySynthesis
 
 Additional Passes
 =================
@@ -108,6 +117,7 @@ from .layout import SetLayout
 from .layout import TrivialLayout
 from .layout import DenseLayout
 from .layout import NoiseAdaptiveLayout
+from .layout import SabreLayout
 from .layout import CSPLayout
 from .layout import ApplyLayout
 from .layout import Layout2qDistance
@@ -119,6 +129,7 @@ from .routing import BasicSwap
 from .routing import LayoutTransformation
 from .routing import LookaheadSwap
 from .routing import StochasticSwap
+from .routing import SabreSwap
 
 # basis change
 from .basis import Decompose
@@ -139,6 +150,7 @@ from .optimization import RemoveResetInZeroState
 from .optimization import RemoveDiagonalGatesBeforeMeasure
 from .optimization import CrosstalkAdaptiveSchedule
 from .optimization import HoareOptimizer
+from .optimization import TemplateOptimization
 
 # circuit analysis
 from .analysis import ResourceEstimation
@@ -149,6 +161,9 @@ from .analysis import CountOps
 from .analysis import CountOpsLongestPath
 from .analysis import NumTensorFactors
 from .analysis import DAGLongestPath
+
+# synthesis
+from .synthesis import UnitarySynthesis
 
 # additional utility passes
 from .utils import CheckMap

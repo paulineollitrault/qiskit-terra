@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # This code is part of Qiskit.
 #
 # (C) Copyright IBM 2020.
@@ -59,9 +57,10 @@ class DAGDependency:
 
     **Reference:**
 
-    [1] Iten, R., Sutter, D. and Woerner, S., 2019.
-    Efficient template matching in quantum circuits.
+    [1] Iten, R., Moyard, R., Metger, T., Sutter, D. and Woerner, S., 2020.
+    Exact and practical pattern matching for quantum circuit optimization.
     `arXiv:1909.05270 <https://arxiv.org/abs/1909.05270>`_
+
     """
 
     def __init__(self):
@@ -75,11 +74,13 @@ class DAGDependency:
         # represent non-commutativity between two gates.
         self._multi_graph = rx.PyDAG()
 
-        # Map of qreg name to QuantumRegister object
+        # Map of qreg/creg name to Register object.
         self.qregs = OrderedDict()
-
-        # Map of creg name to ClassicalRegister object
         self.cregs = OrderedDict()
+
+        # List of all Qubit/Clbit wires.
+        self.qubits = []
+        self.clbits = []
 
     def to_networkx(self):
         """Returns a copy of the DAGDependency in networkx format."""
@@ -100,14 +101,6 @@ class DAGDependency:
         """ Returns the DAGDependency in retworkx format."""
         return self._multi_graph
 
-    def qubits(self):
-        """Return a list of qubits (as a list of Qubit instances)."""
-        return [qubit for qreg in self.qregs.values() for qubit in qreg]
-
-    def clbits(self):
-        """Return a list of classical bits (as a list of Clbit instances)."""
-        return [clbit for creg in self.cregs.values() for clbit in creg]
-
     def size(self):
         """ Returns the number of gates in the circuit"""
         return len(self._multi_graph)
@@ -127,14 +120,18 @@ class DAGDependency:
         if qreg.name in self.qregs:
             raise DAGDependencyError("duplicate register %s" % qreg.name)
         self.qregs[qreg.name] = qreg
+        for j in range(qreg.size):
+            self.qubits.append(qreg[j])
 
     def add_creg(self, creg):
-        """Add all wires in a classical register."""
+        """Add clbits in a classical register."""
         if not isinstance(creg, ClassicalRegister):
             raise DAGDependencyError("not a ClassicalRegister instance.")
         if creg.name in self.cregs:
             raise DAGDependencyError("duplicate register %s" % creg.name)
         self.cregs[creg.name] = creg
+        for j in range(creg.size):
+            self.clbits.append(creg[j])
 
     def _add_multi_graph_node(self, node):
         """
@@ -298,19 +295,16 @@ class DAGDependency:
             qargs (list[Qubit]): list of qubits on which the operation acts
             cargs (list[Clbit]): list of classical wires to attach to.
         """
-        all_qubits = self.qubits()
-        all_clbits = self.clbits()
-
         directives = ['measure', 'barrier', 'snapshot']
         if operation.name not in directives:
             qindices_list = []
             for elem in qargs:
-                qindices_list.append(all_qubits.index(elem))
+                qindices_list.append(self.qubits.index(elem))
             if operation.condition:
-                for clbit in all_clbits:
+                for clbit in self.clbits:
                     if clbit.register == operation.condition[0]:
-                        initial = all_clbits.index(clbit)
-                        final = all_clbits.index(clbit) + clbit.register.size
+                        initial = self.clbits.index(clbit)
+                        final = self.clbits.index(clbit) + clbit.register.size
                         cindices_list = range(initial, final)
                         break
             else:
@@ -451,7 +445,7 @@ class DAGDependency:
         """
         from qiskit.visualization.dag_visualization import dag_drawer
         return dag_drawer(dag=self, scale=scale, filename=filename,
-                          style=style, category='dependency')
+                          style=style)
 
 
 def merge_no_duplicates(*iterables):
@@ -519,9 +513,9 @@ def _commute(node1, node2):
         return commute_directive
 
     # List of non commuting gates (TO DO: add more elements)
-    non_commute_list = [set(['x', 'y']), set(['x', 'z'])]
+    non_commute_list = [{'x', 'y'}, {'x', 'z'}]
 
-    if qarg1 == qarg2 and (set([node1.name, node2.name]) in non_commute_list):
+    if qarg1 == qarg2 and ({node1.name, node2.name} in non_commute_list):
         return False
 
     # Create matrices to check commutation relation if no other criteria are matched

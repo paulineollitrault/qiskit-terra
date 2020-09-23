@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # This code is part of Qiskit.
 #
 # (C) Copyright IBM 2020.
@@ -20,7 +18,7 @@ from qiskit.dagcircuit import DAGDependency
 from qiskit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from qiskit.circuit import Measure
 from qiskit.circuit import Instruction
-from qiskit.extensions.standard.h import HGate
+from qiskit.circuit.library.standard_gates.h import HGate
 from qiskit.dagcircuit.exceptions import DAGDependencyError
 from qiskit.converters import circuit_to_dagdependency
 from qiskit.test import QiskitTestCase
@@ -71,12 +69,12 @@ class TestDagRegisters(QiskitTestCase):
         dag.add_qreg(QuantumRegister(1, 'qr3'))
         dag.add_qreg(QuantumRegister(1, 'qr4'))
         dag.add_qreg(QuantumRegister(1, 'qr6'))
-        self.assertListEqual(dag.qubits(), [QuantumRegister(1, 'qr1')[0],
-                                            QuantumRegister(1, 'qr10')[0],
-                                            QuantumRegister(1, 'qr0')[0],
-                                            QuantumRegister(1, 'qr3')[0],
-                                            QuantumRegister(1, 'qr4')[0],
-                                            QuantumRegister(1, 'qr6')[0]])
+        self.assertListEqual(dag.qubits, [QuantumRegister(1, 'qr1')[0],
+                                          QuantumRegister(1, 'qr10')[0],
+                                          QuantumRegister(1, 'qr0')[0],
+                                          QuantumRegister(1, 'qr3')[0],
+                                          QuantumRegister(1, 'qr4')[0],
+                                          QuantumRegister(1, 'qr6')[0]])
 
     def test_add_reg_duplicate(self):
         """add_qreg with the same register twice is not allowed."""
@@ -104,6 +102,7 @@ class TestDagNodeEdge(QiskitTestCase):
     """Test adding nodes and edges to a dag and related functions."""
 
     def setUp(self):
+        super().setUp()
         self.dag = DAGDependency()
         self.qreg = QuantumRegister(2, 'qr')
         self.creg = ClassicalRegister(2, 'cr')
@@ -166,6 +165,7 @@ class TestDagNodeSelection(QiskitTestCase):
     """Test methods that select successors and predecessors"""
 
     def setUp(self):
+        super().setUp()
         self.dag = DAGDependency()
         self.qreg = QuantumRegister(2, 'qr')
         self.creg = ClassicalRegister(2, 'cr')
@@ -215,6 +215,7 @@ class TestDagProperties(QiskitTestCase):
     """
 
     def setUp(self):
+        super().setUp()
         qr1 = QuantumRegister(4)
         qr2 = QuantumRegister(2)
         circ = QuantumCircuit(qr1, qr2)

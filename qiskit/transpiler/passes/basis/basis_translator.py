@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 # This code is part of Qiskit.
 #
 # (C) Copyright IBM 2017, 2020.
@@ -87,8 +85,16 @@ class BasisTranslator(TransformationPass):
         basic_instrs = ['measure', 'reset', 'barrier', 'snapshot']
 
         target_basis = set(self._target_basis).union(basic_instrs)
-        source_basis = set((node.op.name, node.op.num_qubits)
-                           for node in dag.op_nodes())
+
+        source_basis = set()
+        for node in dag.op_nodes():
+            name = node.op.name
+            qubit_params = (tuple([node.qargs[0].index]), tuple(node.op.params))
+            if (dag.calibrations and name in dag.calibrations
+                    and qubit_params in dag.calibrations[name]):
+                pass
+            else:
+                source_basis.add((name, node.op.num_qubits))
 
         logger.info('Begin BasisTranslator from source basis %s to target '
                     'basis %s.', source_basis, target_basis)
@@ -124,6 +130,12 @@ class BasisTranslator(TransformationPass):
             if node.name in target_basis:
                 continue
 
+            if dag.calibrations and node.name in dag.calibrations:
+                qubit = tuple([node.qargs[0].index])
+                params = tuple(node.op.params)
+                if (qubit, params) in dag.calibrations[node.name]:
+                    continue
+
             if (node.op.name, node.op.num_qubits) in instr_map:
                 target_params, target_dag = instr_map[node.op.name, node.op.num_qubits]
 
@@ -134,16 +146,19 @@ class BasisTranslator(TransformationPass):
                             node.op.params, node.op.name,
                             target_params, target_dag))
 
-                # Convert target to circ and back to assign_parameters, since
-                # DAGCircuits won't have a ParameterTable.
-                from qiskit.converters import dag_to_circuit, circuit_to_dag
-                target_circuit = dag_to_circuit(target_dag)
+                if node.op.params:
+                    # Convert target to circ and back to assign_parameters, since
+                    # DAGCircuits won't have a ParameterTable.
+                    from qiskit.converters import dag_to_circuit, circuit_to_dag
+                    target_circuit = dag_to_circuit(target_dag)
 
-                target_circuit.assign_parameters(
-                    dict(zip_longest(target_params, node.op.params)),
-                    inplace=True)
+                    target_circuit.assign_parameters(
+                        dict(zip_longest(target_params, node.op.params)),
+                        inplace=True)
 
-                bound_target_dag = circuit_to_dag(target_circuit)
+                    bound_target_dag = circuit_to_dag(target_circuit)
+                else:
+                    bound_target_dag = target_dag
 
                 if (len(bound_target_dag.op_nodes()) == 1
                         and len(bound_target_dag.op_nodes()[0].qargs) == len(node.qargs)):
@@ -165,7 +180,7 @@ def _basis_heuristic(basis, target):
     elements in the symmetric difference of the circuit basis and the device
     basis.
     """
-    return len(set(gate_name for gate_name, gate_num_qubits in basis) ^ target)
+    return len({gate_name for gate_name, gate_num_qubits in basis} ^ target)
 
 
 def _basis_search(equiv_lib, source_basis, target_basis, heuristic):
@@ -221,7 +236,7 @@ def _basis_search(equiv_lib, source_basis, target_basis, heuristic):
             # so skip here.
             continue
 
-        if set(gate_name for gate_name, gate_num_qubits in current_basis).issubset(target_basis):
+        if {gate_name for gate_name, gate_num_qubits in current_basis}.issubset(target_basis):
             # Found target basis. Construct transform path.
             rtn = []
             last_basis = current_basis
@@ -246,8 +261,8 @@ def _basis_search(equiv_lib, source_basis, target_basis, heuristic):
 
             basis_remain = current_basis - {(gate_name, gate_num_qubits)}
             neighbors = [
-                (frozenset(basis_remain | set((inst.name, inst.num_qubits)
-                                              for inst, qargs, cargs in equiv.data)),
+                (frozenset(basis_remain | {(inst.name, inst.num_qubits)
+                                           for inst, qargs, cargs in equiv.data}),
                  params,
                  equiv)
                 for params, equiv in equivs]
